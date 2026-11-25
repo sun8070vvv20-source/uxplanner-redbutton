@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>if (window.self !== window.top) document.documentElement.classList.add('in-frame');</script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>상담 신청 · 배정 · 서울영테크 | 박세훈 포트폴리오</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* 서울영테크 맞춤 재무 상담 — 신청(사용자)과 배정(관리자) 재현 (2026-11-01)
+   신청 양식 항목은 운영 화면(portfolio/images/영테크.png) 그대로: 참여자격 3종 · 직업 6종 · 관심분야 10종 · 상담가능시간 5종.
+   사실: 직종·연령·상담 주제 기준 5개 유형, 신청할 때 자동 분류, 신청 → 배정 → 진행 → 완료 4단계 상태.
+   유형 이름과 분류 규칙, 상담사·신청자는 원문에 없어 시연용 예시로 둔다(화면에 표시). */
+:root{
+  --bg:#F5F6FA; --card:#fff; --ink:#191F28; --ink2:#333D4B; --sub:#4E5968; --mute:#6B7684; --line:#E5E8EB; --well:#F2F4F6;
+  --pri:#1D6CE0; --pri-h:#185BBD; --pri-50:#EAF2FE; --teal:#0E7C86; --ok:#0B8A55; --ok-50:#E7F6EE; --warn:#B25E00; --warn-50:#FFF3E0; --err:#D22030;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink2);font-size:14px;line-height:1.55;word-break:keep-all;
+  font-family:'Pretendard Variable',Pretendard,-apple-system,'Malgun Gothic',sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid #3182f6;outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 24px 72px}
+
+/* 사이트 머리 */
+.site{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.site__logo{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:8px;background:var(--teal);color:#fff;font-size:14px;font-weight:800;letter-spacing:-.02em}
+.site__t{font-size:20px;font-weight:800;color:var(--ink);letter-spacing:-.03em}
+.site__n{margin-left:auto;font-size:12.5px;color:var(--mute)}
+/* 화면 바꾸기 */
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:12px;background:#E9EBF0;margin-bottom:18px}
+.seg button{height:38px;padding:0 16px;border:0;border-radius:9px;background:none;font-size:14px;font-weight:700;color:var(--sub);cursor:pointer;transition:background .16s,color .16s}
+.seg button[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,25,54,.12)}
+.pane{display:none}
+.pane.on{display:block}
+
+/* 카드 */
+.card{background:var(--card);border-radius:16px;box-shadow:0 2px 10px rgba(0,25,54,.05);padding:24px 26px}
+.card + .card{margin-top:14px}
+.card__h{display:flex;align-items:baseline;gap:8px;margin:0 0 14px;font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.card__h small{font-size:12.5px;font-weight:500;color:var(--mute)}
+
+/* ── 신청 화면 ── */
+.apply{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.row{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;padding:14px 0;border-top:1px solid var(--well)}
+.row:first-of-type{border-top:0;padding-top:4px}
+.row__k{padding-top:8px;font-size:13.5px;font-weight:700;color:var(--ink2)}
+.row__k .req{color:var(--err);margin-left:2px}
+.row__k small{display:block;font-size:12px;font-weight:500;color:var(--mute)}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{position:relative}
+.opt input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.opt span{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13.5px;font-weight:600;color:var(--ink2);transition:background .16s,border-color .16s,color .16s}
+.opt input:hover + span{border-color:#B0B8C1}
+.opt input:checked + span{border-color:var(--pri);background:var(--pri-50);color:var(--pri)}
+.opt input:focus-visible + span{outline:2px solid #3182f6;outline-offset:2px}
+.elig{display:grid;gap:6px;width:100%}
+.elig .opt span{width:100%;justify-content:space-between;min-height:42px;border-radius:10px;padding:0 14px}
+.elig .opt span em{font-style:normal;font-size:12px;font-weight:600;color:var(--mute)}
+.inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+select{height:38px;padding:0 34px 0 12px;border:1px solid var(--line);border-radius:10px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%234E5968' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 12px center;-webkit-appearance:none;appearance:none;font-size:13.5px;color:var(--ink);cursor:pointer}
+.age{font-size:13px;font-weight:700;color:var(--sub)}
+.age.bad{color:var(--err)}
+.hint{margin:6px 0 0;font-size:12px;color:var(--mute)}
+
+/* 분류 미리보기 */
+.side{position:sticky;top:16px}
+.typebox{border-radius:14px;background:var(--well);padding:16px}
+.typebox__k{font-size:12.5px;font-weight:700;color:var(--mute)}
+.typebox__v{margin-top:4px;font-size:26px;font-weight:800;color:var(--ink);letter-spacing:-.03em}
+.typebox__v.ready{color:var(--pri)}
+.why{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.why li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;font-size:13px}
+.why b{color:var(--mute);font-weight:700}
+.why span{color:var(--ink2);font-weight:600}
+.demo-note{margin:10px 0 0;font-size:11.5px;line-height:1.6;color:var(--mute)}
+/* 상태 4단계 */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);margin:16px 0 0;padding:0;list-style:none}
+.steps li{position:relative;text-align:center;font-size:12.5px;font-weight:700;color:var(--mute)}
+.steps li i{position:relative;z-index:1;display:grid;place-items:center;width:28px;height:28px;margin:0 auto 6px;border-radius:50%;background:#fff;border:2px solid var(--line);font-style:normal;font-size:12px;color:var(--mute)}
+.steps li + li::before{content:"";position:absolute;left:calc(-50% + 16px);right:calc(50% + 16px);top:13px;height:2px;background:var(--line)}
+.steps li.done i{background:var(--pri);border-color:var(--pri);color:#fff}
+.steps li.done{color:var(--ink)}
+.steps li.done + li::before,.steps li.done + li.done::before{background:var(--pri)}
+.steps li.cur i{border-color:var(--pri);color:var(--pri)}
+.steps li.cur{color:var(--pri)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 18px;border:0;border-radius:10px;font-size:14.5px;font-weight:700;cursor:pointer;transition:background .16s}
+.btn--pri{background:var(--pri);color:#fff}
+.btn--pri:hover{background:var(--pri-h)}
+.btn--weak{background:var(--well);color:var(--ink2)}
+.btn--weak:hover{background:var(--line)}
+.btn--sm{height:32px;padding:0 11px;border-radius:8px;font-size:12.5px}
+.btn[disabled]{opacity:.45;cursor:default}
+.side .btn--pri{width:100%;margin-top:16px}
+.msg{min-height:20px;margin:10px 0 0;font-size:12.5px;line-height:1.6;color:var(--mute)}
+.msg.err{color:var(--err)}
+.msg.ok{color:var(--ok);font-weight:700}
+
+/* ── 관리자 · 배정 ── */
+.sum{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.sum button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 16px;border:1px solid transparent;border-radius:14px;background:#fff;box-shadow:0 2px 10px rgba(0,25,54,.05);cursor:pointer;text-align:left;transition:border-color .16s}
+.sum button:hover{border-color:var(--line)}
+.sum button[aria-pressed="true"]{border-color:var(--pri);background:var(--pri-50)}
+.sum b{font-size:13px;color:var(--sub)}
+.sum strong{font-size:24px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.sum span{font-size:12px;color:var(--mute)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{padding:10px 10px;background:var(--well);color:var(--sub);font-weight:700;text-align:left;white-space:nowrap}
+.tbl th:first-child{border-radius:10px 0 0 10px}
+.tbl th:last-child{border-radius:0 10px 10px 0}
+.tbl td{padding:12px 10px;border-bottom:1px solid var(--well);vertical-align:middle}
+.tbl tr.new td{background:#FAFCFF}
+.tbl tr.new td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
+.tbl tr[hidden]{display:none}
+.tt{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:6px;background:var(--pri-50);color:var(--pri);font-size:12px;font-weight:800;white-space:nowrap}
+.st{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.st--0{background:var(--warn-50);color:var(--warn)}
+.st--1{background:var(--pri-50);color:var(--pri)}
+.st--2{background:#F3EEFF;color:#6B3FC9}
+.st--3{background:var(--ok-50);color:var(--ok)}
+.tbl select{height:32px;font-size:12.5px;padding:0 30px 0 10px;border-radius:8px}
+.act{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.empty{padding:28px 0;text-align:center;color:var(--mute)}
+.legend{margin:12px 0 0;font-size:12px;color:var(--mute)}
+
+/* 알림 */
+.toast{position:fixed;left:50%;bottom:24px;z-index:9997;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  padding:11px 16px;border-radius:12px;background:#191F28;color:#fff;font-size:13px;font-weight:600;box-shadow:0 10px 26px rgba(0,12,30,.3);transition:opacity .2s,transform .2s}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+
+@media(max-width:900px){
+  .apply{grid-template-columns:1fr}
+  .side{position:static}
+  .sum{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tbl-wrap{overflow-x:auto}
+}
+@media(max-width:640px){
+  .wrap{padding:16px 14px 84px}
+  .row{grid-template-columns:1fr;gap:6px}
+  .row__k{padding-top:0}
+  .site__n{display:none}
+}
+
+/* ── 튜토리얼 : 다른 시연 화면과 같은 구조 ── */
+.tut[hidden]{display:none}
+.tut{position:fixed;inset:0;z-index:99999;pointer-events:auto;cursor:default;overscroll-behavior:contain;-webkit-user-select:none;user-select:none;
+  font-family:'Pretendard Variable',Pretendard,-apple-system,'Malgun Gothic',sans-serif}
+html.tut-lock, html.tut-lock body{-webkit-user-select:none;user-select:none}
+.tut__ring{position:absolute;border-radius:10px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,12,30,.66), 0 0 0 3px #3182f6;
+  transition:top .32s cubic-bezier(.22,1,.36,1),left .32s cubic-bezier(.22,1,.36,1),width .32s cubic-bezier(.22,1,.36,1),height .32s cubic-bezier(.22,1,.36,1)}
+.tut__pop{position:absolute;pointer-events:auto;width:min(360px,calc(100vw - 32px));padding:18px 20px 16px;background:#fff;border-radius:16px;
+  box-shadow:0 20px 50px rgba(0,12,30,.36);transition:top .32s cubic-bezier(.22,1,.36,1),left .32s cubic-bezier(.22,1,.36,1)}
+.tut__no{display:flex;align-items:center;gap:7px;margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.06em;color:#3182f6}
+.tut__no i{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:#3182f6;font-style:normal}
+.tut__txt{margin:0;font-size:14px;line-height:1.72;color:#333d4b;word-break:keep-all}
+.tut__txt b{font-weight:700;color:#191f28}
+.tut__acts{display:flex;align-items:center;gap:8px;margin-top:16px}
+.tut__acts button{height:36px;padding:0 14px;border:0;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:-.01em}
+.tut__skip{margin-right:auto;background:none;color:#8b95a1}
+.tut__skip:hover{color:#4e5968}
+.tut__prev{background:#f2f4f6;color:#4e5968}
+.tut__prev:hover{background:#e5e8eb}
+.tut__prev[disabled]{opacity:.4;cursor:default}
+.tut__next{background:#3182f6;color:#fff}
+.tut__next:hover{background:#2272eb}
+@media(max-width:640px){ .tut__pop{width:calc(100vw - 24px);left:12px !important} }
+@media(prefers-reduced-motion:reduce){ .tut__ring,.tut__pop{transition:none} }
+.tut-open{position:fixed;right:16px;bottom:16px;z-index:9998;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border:0;border-radius:999px;cursor:pointer;
+  background:#3182f6;color:#fff;box-shadow:0 6px 18px rgba(49,130,246,.34);font-size:13px;font-weight:700;letter-spacing:-.01em;transition:background .16s}
+.tut-open:hover{background:#2272eb}
+.tut-open svg{width:15px;height:15px;flex:0 0 15px}
+.tut:not([hidden]) ~ .tut-open{display:none}
+
+/* 포트폴리오 모달 안: 설명 단추는 모달 아래 '설명 다시 보기'가 맡는다 (2026-11-01) */
+.in-frame .tut-open{display:none}
+/* v36: 자전거행복나눔 시연(bkIn .32s)과 같은 진입 애니메이션 */
+@keyframes demoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.pane.on{animation:demoIn .32s ease both}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <span class="site__logo">서울영테크</span>
+    <span class="site__t">맞춤 재무 상담</span>
+    <span class="site__n">시연용 재현 화면 · 신청자·상담사·유형 이름은 예시</span>
+  </header>
+
+  <div class="seg" role="tablist" aria-label="화면 선택">
+    <button type="button" role="tab" aria-selected="true" aria-controls="pane-apply" id="tab-apply" data-p="apply">신청 화면</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="pane-admin" id="tab-admin" data-p="admin">관리자 · 배정 화면</button>
+  </div>
+
+  <!-- ══ 신청 화면(사용자) ══ -->
+  <section class="pane on" id="pane-apply" role="tabpanel" aria-labelledby="tab-apply">
+    <div class="apply">
+      <form class="card" id="form" novalidate>
+        <h2 class="card__h">상담 신청서 <small>* 표시는 필수</small></h2>
+        <div class="row" id="rowElig">
+          <p class="row__k">참여자격 인증<span class="req">*</span><small>연령 : 만 19세~39세</small></p>
+          <div class="elig">
+            <label class="opt"><input type="radio" name="elig" value="거주"><span>서울에 거주하는 2030 청년<em>서울청년인증</em></span></label>
+            <label class="opt"><input type="radio" name="elig" value="대학"><span>서울 소재 대학 재·휴학생<em>서울소재 대학(원)생</em></span></label>
+            <label class="opt"><input type="radio" name="elig" value="군인"><span>서울에 근무하는 군인 청년<em>서울소재 군인</em></span></label>
+          </div>
+        </div>
+        <div class="row" id="rowAge">
+          <p class="row__k">출생연도<span class="req">*</span></p>
+          <div class="inline">
+            <select id="birth" aria-label="출생연도"><option value="">선택</option></select>
+            <span class="age" id="ageTxt" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="row" id="rowJob">
+          <p class="row__k">직업<span class="req">*</span></p>
+          <div class="opts" id="jobs"></div>
+        </div>
+        <div class="row" id="rowTopic">
+          <p class="row__k">관심분야<span class="req">*</span><small>(중복선택 가능)</small></p>
+          <div>
+            <div class="opts" id="topics"></div>
+          </div>
+        </div>
+        <div class="row" id="rowTime">
+          <p class="row__k">상담가능시간<span class="req">*</span><small>(중복선택 가능)</small></p>
+          <div class="opts" id="times"></div>
+        </div>
+      </form>
+
+      <aside class="side">
+        <div class="card" id="preview">
+          <h2 class="card__h">신청할 때 유형 자동 분류</h2>
+          <div class="typebox">
+            <p class="typebox__k">분류 결과</p>
+            <p class="typebox__v" id="typeV" aria-live="polite">입력을 기다리는 중</p>
+            <ul class="why" id="why">
+              <li><b>직종</b><span id="wJob">-</span></li>
+              <li><b>연령</b><span id="wAge">-</span></li>
+              <li><b>주제</b><span id="wTopic">-</span></li>
+            </ul>
+          </div>
+          <p class="demo-note">직종·연령·상담 주제로 5개 유형 중 하나를 고릅니다. 유형 이름과 나누는 규칙은 시연용 예시입니다.</p>
+          <ol class="steps" id="userSteps" aria-label="상담 상태">
+            <li class="cur"><i>1</i>신청</li><li><i>2</i>배정</li><li><i>3</i>진행</li><li><i>4</i>완료</li>
+          </ol>
+          <button type="button" class="btn btn--pri" id="btnApply">신청하기</button>
+          <p class="msg" id="applyMsg" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ══ 관리자 · 배정 화면 ══ -->
+  <section class="pane" id="pane-admin" role="tabpanel" aria-labelledby="tab-admin">
+    <div class="sum" id="sum" aria-label="유형별 배정 대기"></div>
+    <div class="card">
+      <h2 class="card__h">상담 신청 목록 <small id="listNote">유형 칸을 누르면 그 유형만 봅니다</small></h2>
+      <div class="tbl-wrap">
+        <table class="tbl" id="tbl">
+          <caption class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">상담 신청 목록 · 유형, 상태, 담당 상담사</caption>
+          <thead><tr><th scope="col">신청 번호</th><th scope="col">신청자</th><th scope="col">신청일</th><th scope="col">유형</th><th scope="col">관심분야</th><th scope="col">상담가능시간</th><th scope="col">상태</th><th scope="col">담당 상담사 · 처리</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="legend">상태는 신청 → 배정 → 진행 → 완료 4단계로 바뀝니다. 담당 상담사는 유형별 예시 담당으로 미리 골라 두고, 바꿔서 배정할 수 있습니다.</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  /* 운영 화면 양식 항목 그대로 */
+  var JOBS = ['군인','대학(원)생','근로소득자','자영업자','현재 구직중','기타'];
+  var TOPICS = ['종합재무상담','소득지출관리','부채관리','신용관리','목돈만들기','금융투자상품선택','기가입 금융투자상품분석','기가입 보험상품분석','거주주택마련(임차계약포함)','노후준비'];
+  var TIMES = ['요일무관','평일오전','평일오후','주말오전','주말오후'];
+  var STATES = ['신청','배정','진행','완료'];
+  var THIS_YEAR = 2026;
+  /* 시연용 예시: 유형별 담당 상담사(가명) */
+  var COUNSEL = ['상담사 가','상담사 나','상담사 다','상담사 라','상담사 마'];
+
+  function opt(name, type, v){ return '<label class="opt"><input type="'+type+'" name="'+name+'" value="'+v+'"><span>'+v+'</span></label>'; }
+  document.getElementById('jobs').innerHTML = JOBS.map(function(v){ return opt('job','radio',v); }).join('');
+  document.getElementById('topics').innerHTML = TOPICS.map(function(v){ return opt('topic','checkbox',v); }).join('');
+  document.getElementById('times').innerHTML = TIMES.map(function(v){ return opt('time','checkbox',v); }).join('');
+  var birth = document.getElementById('birth');
+  for (var y = THIS_YEAR - 16; y >= THIS_YEAR - 45; y--) { var o = document.createElement('option'); o.value = y; o.textContent = y + '년'; birth.appendChild(o); }
+
+  /* 시연용 예시 규칙: 직종 → 주제 → 연령 순으로 본다(실제 기준은 원문에 없음) */
+  function classify(job, age, topics){
+    if (!job || !age || !topics.length) return 0;
+    var has = function(k){ return topics.some(function(t){ return t.indexOf(k) > -1; }); };
+    if (job === '대학(원)생' || job === '현재 구직중') return 1;
+    if (has('부채') || has('신용')) return 2;
+    if (age >= 30 && (has('주택') || has('노후'))) return 3;
+    if (has('목돈') || has('투자') || has('보험')) return 4;
+    return 5;
+  }
+  function ageBand(a){ return a ? (a < 30 ? '20대' : '30대') + ' (만 ' + a + '세)' : '-'; }
+  function vals(name){ return [].slice.call(document.querySelectorAll('input[name="'+name+'"]:checked')).map(function(i){ return i.value; }); }
+
+  var typeV = document.getElementById('typeV'), ageTxt = document.getElementById('ageTxt'), msg = document.getElementById('applyMsg');
+  var submitted = false;
+  function readForm(){
+    var y = +birth.value, age = y ? THIS_YEAR - y - 1 : 0;   // 시연 기준일 2026-11-01, 생일 전으로 가정한 만 나이
+    return { elig: vals('elig')[0] || '', job: vals('job')[0] || '', age: age, topics: vals('topic'), times: vals('time') };
+  }
+  function refresh(){
+    var f = readForm();
+    ageTxt.textContent = f.age ? '만 ' + f.age + '세' + (f.age < 19 || f.age > 39 ? ' · 참여 연령이 아닙니다' : '') : '';
+    ageTxt.className = 'age' + (f.age && (f.age < 19 || f.age > 39) ? ' bad' : '');
+    var t = classify(f.job, f.age, f.topics);
+    typeV.textContent = t ? '유형 ' + t : '입력을 기다리는 중';
+    typeV.className = 'typebox__v' + (t ? ' ready' : '');
+    document.getElementById('wJob').textContent = f.job || '-';
+    document.getElementById('wAge').textContent = ageBand(f.age);
+    document.getElementById('wTopic').textContent = f.topics.length ? f.topics.join(', ') : '-';
+    if (!submitted) { msg.textContent = ''; msg.className = 'msg'; }
+  }
+  document.getElementById('form').addEventListener('change', function(){ if (submitted) resetUser(); refresh(); });
+
+  function setSteps(el, n){   // n = 지금 단계(0~3), 완료면 모두 done
+    [].forEach.call(el.children, function(li, k){
+      li.className = (k < n || (n === 3 && k === 3)) ? 'done' : (k === n ? 'cur' : '');
+    });
+  }
+  var userSteps = document.getElementById('userSteps');
+  function resetUser(){ submitted = false; setSteps(userSteps, 0); document.getElementById('btnApply').disabled = false; }
+
+  /* 관리자 목록: 시연용 예시 신청 */
+  var LIST = [
+    { no:'S-1041', name:'김○○', date:'10.28', type:2, topics:['부채관리'], times:['평일오후'], st:0 },
+    { no:'S-1042', name:'이○○', date:'10.28', type:1, topics:['소득지출관리','목돈만들기'], times:['주말오전'], st:0 },
+    { no:'S-1043', name:'박○○', date:'10.29', type:4, topics:['기가입 보험상품분석'], times:['요일무관'], st:1, who:3 },
+    { no:'S-1044', name:'최○○', date:'10.30', type:3, topics:['거주주택마련(임차계약포함)'], times:['평일오전'], st:2, who:2 },
+    { no:'S-1045', name:'정○○', date:'10.31', type:5, topics:['종합재무상담'], times:['주말오후'], st:0 },
+    { no:'S-1046', name:'한○○', date:'10.31', type:2, topics:['신용관리','부채관리'], times:['평일오후'], st:3, who:1 }
+  ];
+  var filterType = 0, seq = 1047;
+  var rowsEl = document.getElementById('rows'), sumEl = document.getElementById('sum');
+
+  function renderSum(){
+    var html = '';
+    for (var t = 1; t <= 5; t++) {
+      var wait = LIST.filter(function(r){ return r.type === t && r.st === 0; }).length;
+      var all = LIST.filter(function(r){ return r.type === t; }).length;
+      html += '<button type="button" data-t="'+t+'" aria-pressed="'+(filterType === t)+'"><b>유형 '+t+'</b><strong>'+wait+'건</strong><span>배정 대기 · 전체 '+all+'건</span></button>';
+    }
+    sumEl.innerHTML = html;
+  }
+  function renderRows(){
+    var shown = LIST.filter(function(r){ return !filterType || r.type === filterType; });
+    if (!shown.length) { rowsEl.innerHTML = '<tr><td colspan="8" class="empty">해당 유형 신청이 없습니다.</td></tr>'; return; }
+    rowsEl.innerHTML = shown.map(function(r){
+      var who = r.who != null ? r.who : r.type - 1;
+      var act;
+      if (r.st === 0) {
+        act = '<select data-who="'+r.no+'" aria-label="'+r.no+' 담당 상담사">' + COUNSEL.map(function(c, k){ return '<option value="'+k+'"'+(k === who ? ' selected' : '')+'>'+c+'</option>'; }).join('') + '</select>'
+            + '<button type="button" class="btn btn--pri btn--sm" data-go="'+r.no+'">배정</button>';
+      } else if (r.st === 1) {
+        act = '<span>'+COUNSEL[who]+'</span><button type="button" class="btn btn--weak btn--sm" data-go="'+r.no+'">상담 시작</button>';
+      } else if (r.st === 2) {
+        act = '<span>'+COUNSEL[who]+'</span><button type="button" class="btn btn--weak btn--sm" data-go="'+r.no+'">완료 처리</button>';
+      } else {
+        act = '<span>'+COUNSEL[who]+'</span>';
+      }
+      return '<tr class="'+(r.isNew ? 'new' : '')+'"><td>'+r.no+'</td><td>'+r.name+'</td><td>'+r.date+'</td><td><span class="tt">유형 '+r.type+'</span></td>'
+        + '<td>'+r.topics.join(', ')+'</td><td>'+r.times.join(', ')+'</td><td><span class="st st--'+r.st+'">'+STATES[r.st]+'</span></td><td><div class="act">'+act+'</div></td></tr>';
+    }).join('');
+  }
+  function render(){ renderSum(); renderRows(); }
+  render();
+
+  sumEl.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-t]'); if (!b) return;
+    var t = +b.dataset.t; filterType = filterType === t ? 0 : t; render();
+  });
+  rowsEl.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-go]'); if (!b) return;
+    var r = LIST.filter(function(x){ return x.no === b.dataset.go; })[0]; if (!r) return;
+    if (r.st === 0) { var s = rowsEl.querySelector('select[data-who="'+r.no+'"]'); r.who = s ? +s.value : r.type - 1; }
+    r.st = Math.min(3, r.st + 1);
+    toast(r.no + ' · ' + STATES[r.st] + (r.st === 1 ? ' (' + COUNSEL[r.who] + ')' : ''));
+    if (r.isMine) setSteps(userSteps, r.st);
+    render();
+  });
+
+  /* 신청하기: 필수 확인 → 유형 자동 분류 → 관리자 목록 맨 위에 '배정 대기'로 */
+  document.getElementById('btnApply').addEventListener('click', function(){
+    var f = readForm(), miss = [];
+    if (!f.elig) miss.push(['rowElig','참여자격 인증']);
+    if (!f.age) miss.push(['rowAge','출생연도']);
+    if (!f.job) miss.push(['rowJob','직업']);
+    if (!f.topics.length) miss.push(['rowTopic','관심분야']);
+    if (!f.times.length) miss.push(['rowTime','상담가능시간']);
+    msg.className = 'msg err';
+    if (miss.length) { msg.textContent = miss.map(function(m){ return m[1]; }).join(', ') + '을(를) 선택해 주세요.'; document.getElementById(miss[0][0]).scrollIntoView({ block:'center', behavior:'smooth' }); return; }
+    if (f.age < 19 || f.age > 39) { msg.textContent = '참여 연령(만 19세~39세)이 아닙니다.'; return; }
+    var t = classify(f.job, f.age, f.topics);
+    LIST.forEach(function(r){ r.isNew = false; });
+    LIST.unshift({ no:'S-' + (seq++), name:'나(시연)', date:'11.01', type:t, topics:f.topics, times:f.times, st:0, isNew:true, isMine:true });
+    filterType = 0; render();
+    submitted = true; setSteps(userSteps, 0);
+    msg.className = 'msg ok'; msg.textContent = '신청 완료 · 유형 ' + t + '(으)로 분류되어 배정 대기 중입니다. 관리자 화면에서 배정해 보세요.';
+    this.disabled = true;
+  });
+
+  /* 화면 바꾸기 */
+  var tabs = [].slice.call(document.querySelectorAll('.seg [data-p]'));
+  function go(p){
+    tabs.forEach(function(b){ var on = b.dataset.p === p; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+    document.getElementById('pane-apply').classList.toggle('on', p === 'apply');
+    document.getElementById('pane-admin').classList.toggle('on', p === 'admin');
+  }
+  tabs.forEach(function(b, i){
+    b.addEventListener('click', function(){ go(b.dataset.p); });
+    b.addEventListener('keydown', function(e){ if (e.key === 'ArrowRight' || e.key === 'ArrowLeft'){ e.preventDefault(); var n = tabs[(i + 1) % 2]; go(n.dataset.p); n.focus(); } });
+  });
+  window.ytcGo = go;
+
+  var toastEl = document.getElementById('toast'), tt = null;
+  function toast(s){ toastEl.textContent = s; toastEl.classList.add('on'); clearTimeout(tt); tt = setTimeout(function(){ toastEl.classList.remove('on'); }, 1800); }
+  refresh();
+})();
+</script>
+
+<div class="tut" id="tut" hidden>
+  <div class="tut__ring" id="tutRing"></div>
+  <div class="tut__pop" id="tutPop">
+    <p class="tut__no"><i></i><span id="tutNo">1 / 5</span></p>
+    <p class="tut__txt" id="tutTxt"></p>
+    <div class="tut__acts">
+      <button type="button" class="tut__skip" id="tutSkip">건너뛰기</button>
+      <button type="button" class="tut__prev" id="tutPrev">이전</button>
+      <button type="button" class="tut__next" id="tutNext">다음</button>
+    </div>
+  </div>
+</div>
+<button type="button" class="tut-open" id="tutOpen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  설명 보기
+</button>
+
+<script>
+(function(){
+  var KEY = 'tut:ytc';
+  var STEPS = [
+    {"sel": "#rowJob", "txt": "신청서에서 <b>직업 · 출생연도 · 관심분야</b>를 받습니다. 이 세 가지가 유형을 나누는 기준입니다.", "before": "window.ytcGo('apply');"},
+    {"sel": "#preview .typebox", "txt": "입력하는 대로 <b>5개 유형 중 하나로 자동 분류</b>됩니다. 상담사가 신청서를 읽고 직접 나누던 단계가 빠집니다."},
+    {"sel": "#userSteps", "txt": "신청자는 <b>신청 → 배정 → 진행 → 완료</b> 4단계로 지금 상태를 봅니다."},
+    {"sel": "#sum", "txt": "관리자는 <b>유형별 배정 대기 건수</b>를 먼저 봅니다. 칸을 누르면 그 유형만 걸러 봅니다.", "before": "window.ytcGo('admin');"},
+    {"sel": "#rows tr:first-child .act", "txt": "유형별 담당 상담사가 미리 골라져 있어 <b>배정 단추 한 번</b>으로 넘깁니다. 이어서 상담 시작 · 완료 처리까지 이 목록에서 합니다."}
+  ];
+  var el = document.getElementById('tut'), ring = document.getElementById('tutRing'), pop = document.getElementById('tutPop'),
+      no = document.getElementById('tutNo'), txt = document.getElementById('tutTxt'), prev = document.getElementById('tutPrev'),
+      next = document.getElementById('tutNext'), skip = document.getElementById('tutSkip');
+  var i = 0;
+  function put(t){
+    var r = t.getBoundingClientRect(), pad = 6;
+    ring.style.top = (r.top - pad) + 'px'; ring.style.left = (r.left - pad) + 'px';
+    ring.style.width = (r.width + pad * 2) + 'px'; ring.style.height = (r.height + pad * 2) + 'px';
+    var pw = Math.min(360, window.innerWidth - 32), ph = pop.offsetHeight || 180;
+    var top = r.bottom + 14, left = r.left;
+    if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 14);
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+    pop.style.top = Math.max(12, top) + 'px'; pop.style.left = Math.max(12, left) + 'px';
+  }
+  function place(step){
+    if (step.before) { try { (new Function(step.before))(); } catch(e){} }
+    var t = document.querySelector(step.sel); if (!t) return false;
+    t.scrollIntoView({ block:'center', behavior:'smooth' });
+    setTimeout(function(){ put(t); }, 220);
+    setTimeout(function(){ put(t); }, 620);
+    return true;
+  }
+  function show(n){
+    i = Math.max(0, Math.min(STEPS.length - 1, n));
+    no.textContent = (i + 1) + ' / ' + STEPS.length; txt.innerHTML = STEPS[i].txt;
+    prev.disabled = i === 0; next.textContent = i === STEPS.length - 1 ? '완료' : '다음';
+    place(STEPS[i]);
+  }
+  var SCROLLS = ['wheel','mousewheel','DOMMouseScroll','touchmove'];
+  function eat(e){ e.preventDefault(); e.stopPropagation(); }
+  function keyGuard(e){
+    if (e.key === 'Escape' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') return;
+    if (pop.contains(e.target) && (e.key === 'Enter' || e.key === ' ')) return;
+    e.preventDefault(); e.stopPropagation();
+  }
+  function lock(){ SCROLLS.forEach(function(t){ document.addEventListener(t, eat, { passive:false, capture:true }); }); window.addEventListener('wheel', eat, { passive:false, capture:true });
+    document.addEventListener('keydown', keyGuard, true); document.addEventListener('contextmenu', eat, true); document.documentElement.classList.add('tut-lock'); }
+  function unlock(){ SCROLLS.forEach(function(t){ document.removeEventListener(t, eat, true); }); window.removeEventListener('wheel', eat, true);
+    document.removeEventListener('keydown', keyGuard, true); document.removeEventListener('contextmenu', eat, true); document.documentElement.classList.remove('tut-lock'); }
+  function open(){ el.hidden = false; lock(); show(0); next.focus(); }
+  function close(){ el.hidden = true; unlock(); try { window.ytcGo('apply'); window.scrollTo(0, 0); sessionStorage.setItem(KEY, '1'); } catch(e){} }
+  document.getElementById('tutOpen').addEventListener('click', open);
+  next.addEventListener('click', function(){ i === STEPS.length - 1 ? close() : show(i + 1); });
+  prev.addEventListener('click', function(){ show(i - 1); });
+  skip.addEventListener('click', close);
+  document.addEventListener('keydown', function(e){ if (el.hidden) return; if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') next.click(); else if (e.key === 'ArrowLeft' && i > 0) prev.click(); });
+  window.addEventListener('resize', function(){ if (!el.hidden) place(STEPS[i]); });
+  window.addEventListener('message', function(e){ if (e.data === 'tut:restart') open(); });
+  var seen = false; try { seen = sessionStorage.getItem(KEY) === '1'; } catch(e){}
+  if (!seen) setTimeout(open, 420);
+})();
+</script>
+</body>
+</html>
